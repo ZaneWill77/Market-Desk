@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Market Desk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+  <script src="/static/vendor/plotly.min.js"></script>
+  <script src="/static/vendor/marked.min.js"></script>
+  <script src="/static/vendor/purify.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo">◆</span> Market Desk</div>
+    <div class="status">
+      <span id="mktState" class="pill">—</span>
+      <span id="mktTime" class="muted mono"></span>
+      <button id="refreshBtn" class="btn ghost" title="Clear cache and reload data">↻ Refresh</button>
+      <div id="account" class="account">
+        <button id="signInBtn" class="btn primary">Sign in</button>
+        <div id="signedIn" class="signed-in hidden">
+          <span id="accountLabel" class="pill"></span>
+          <button id="signOutBtn" class="btn ghost">Sign out</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Sign-in dialog -->
+  <dialog id="signInDialog" class="dialog">
+    <form id="signInForm" method="dialog">
+      <h2>Connect Claude</h2>
+      <p class="muted small">The market dashboard works without signing in. Sign in to chat with the Claude analyst.</p>
+      <div id="providerChoice" class="provider-choice"></div>
+
+      <div id="apiKeyFields" class="provider-fields">
+        <label>Anthropic API key
+          <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" />
+        </label>
+        <p class="muted small">
+          Get a key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.
+          Usage is billed to your Anthropic account. Your key is held only in this server's memory for your session,
+          never saved to disk, and erased when you sign out.
+        </p>
+      </div>
+      <div id="noKeyFields" class="provider-fields hidden">
+        <p class="muted small">Uses a local provider configured on this computer. No key needed.</p>
+      </div>
+
+      <p id="signInError" class="msg error hidden"></p>
+      <div class="dialog-actions">
+        <button type="button" id="cancelSignIn" class="btn ghost">Cancel</button>
+        <button type="submit" id="submitSignIn" class="btn primary">Sign in</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="layout">
+    <main class="main">
+      <!-- Market overview -->
+      <section class="card">
+        <div class="card-head">
+          <h2>Market Overview</h2>
+          <div id="regime" class="regime">Loading…</div>
+        </div>
+        <div id="indices" class="indices"></div>
+        <ul id="regimeNotes" class="notes"></ul>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Sector Rotation</h2>
+          <div class="seg" id="sectorTf">
+            <button data-tf="1d">1D</button><button data-tf="1w">1W</button><button data-tf="1m" class="on">1M</button><button data-tf="3m">3M</button><button data-tf="ytd">YTD</button>
+          </div>
+        </div>
+        <div id="sectors" class="sectors"></div>
+      </section>
+
+      <!-- Bot -->
+      <section class="card">
+        <div class="card-head"><h2>Market Bot</h2></div>
+        <div class="controls">
+          <label>Strategy
+            <select id="strategy"></select>
+          </label>
+          <label>Universe
+            <select id="universe"></select>
+          </label>
+          <label id="customWrap" class="hidden grow">Tickers
+            <input id="customTickers" placeholder="AAPL, MSFT, NVDA…" />
+          </label>
+          <button id="runBtn" class="btn primary">▶ Run Bot</button>
+        </div>
+        <p id="stratDesc" class="muted small"></p>
+        <div id="scanOut" class="hidden">
+          <div id="breadth" class="breadth"></div>
+          <div id="narrative" class="narrative"></div>
+          <div class="table-wrap">
+            <table id="results">
+              <thead><tr>
+                <th>#</th><th>Symbol</th><th>Score</th><th>Rating</th><th class="num">Price</th><th class="num">Day</th>
+                <th class="num">1M</th><th class="num">3M</th><th class="num">RSI</th><th class="num">Vol×</th><th class="num">From Hi</th><th>Why</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="row-end">
+            <button id="askScanBtn" class="btn">✦ Ask Claude to analyze these results</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Ticker detail -->
+      <section class="card">
+        <div class="card-head">
+          <h2>Ticker Analysis</h2>
+          <form id="tickerForm" class="ticker-form">
+            <input id="tickerInput" placeholder="Symbol (e.g. NVDA)" value="SPY" />
+            <div class="seg" id="periodSeg">
+              <button type="button" data-p="1d">1D</button><button type="button" data-p="5d">5D</button><button type="button" data-p="1mo">1M</button><button type="button" data-p="3mo">3M</button><button type="button" data-p="6mo">6M</button><button type="button" data-p="1y" class="on">1Y</button><button type="button" data-p="2y">2Y</button><button type="button" data-p="5y">5Y</button>
+            </div>
+          </form>
+        </div>
+        <div id="tickerHeader" class="ticker-header"></div>
+        <div id="chart" class="chart"></div>
+        <div class="split">
+          <div>
+            <h3>Strategy Scorecard</h3>
+            <div id="scorecard" class="scorecard"></div>
+          </div>
+          <div>
+            <h3>Key Levels</h3>
+            <div id="levels" class="kv"></div>
+          </div>
+        </div>
+        <div class="split">
+          <div>
+            <h3>Fundamentals</h3>
+            <div id="fundamentals" class="kv"><span class="muted">—</span></div>
+          </div>
+          <div>
+            <h3>News</h3>
+            <ul id="news" class="news"></ul>
+          </div>
+        </div>
+        <div class="row-end"><button id="askTickerBtn" class="btn">✦ Ask Claude about this ticker</button></div>
+      </section>
+    </main>
+
+    <!-- Claude chat -->
+    <aside class="chat">
+      <div class="chat-head">
+        <div class="chat-title"><span class="spark">✦</span> Claude Analyst</div>
+        <div class="chat-tools">
+          <select id="model" title="Model" disabled></select>
+          <select id="effort" title="Reasoning effort">
+            <option value="">Effort: auto</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+          <button id="newChat" class="btn ghost" title="Start a new conversation">New</button>
+        </div>
+      </div>
+      <div id="messages" class="messages">
+        <div class="msg assistant intro">
+          <p>Hi, I'm your market analyst. I can pull live data, run the strategy bot, read news and search the web.</p>
+          <p id="chatSignInHint" class="muted small"><a href="#" id="chatSignIn">Sign in</a> to start chatting.</p>
+        </div>
+      </div>
+      <div class="chips" id="chips">
+        <button>Give me a full market briefing</button>
+        <button>Which sectors are leading and lagging, and what does that rotation imply?</button>
+        <button>Run a momentum scan on the S&amp;P 100 and explain the top 5</button>
+        <button>What macro events and earnings this week could move the market?</button>
+      </div>
+      <form id="chatForm" class="chat-input">
+        <textarea id="chatText" rows="2" placeholder="Ask about the market…  (Enter to send, Shift+Enter for new line)"></textarea>
+        <button id="sendBtn" class="btn primary" type="submit">Send</button>
+      </form>
+    </aside>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
