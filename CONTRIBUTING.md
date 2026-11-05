@@ -38,6 +38,20 @@ Add an entry to `app/data/universes.json`:
 
 Use Yahoo Finance symbols (`BRK-B`, not `BRK.B`; `^VIX` for indices; `BTC-USD` for crypto).
 
+## Add an alert type
+
+In `app/alerts.py`, write a check function `(snapshot, value, strategy) -> (met, current_value)` and add
+an `AlertType` to `ALERT_TYPES` with a label, a sentence template, the unit (`$`, `%`, `×`, `d` or none)
+and a default threshold. The alert form, the watchlist checks and the tests' "every type is described"
+check all pick it up automatically. Alerts fire when a condition goes from not-met to met.
+
+## Tune the calendar or portfolio rules
+
+- Which US economic releases count as high, medium or low impact: `IMPACT_RULES` in `app/calendar_data.py`
+  (regexes, first match wins; add a test case in `tests/test_calendar.py`).
+- Portfolio observations such as concentration or sector tilt: `_observations()` in `app/portfolio.py`.
+  Keep the wording descriptive ("Technology is 58% of the portfolio"), not prescriptive ("sell X").
+
 ## Add a tool for Claude
 
 In `app/tools.py`:

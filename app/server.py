@@ -11,8 +11,11 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import auth, bot, market_data as md
-from .indicators import bollinger, macd, rsi, sma
+from datetime import datetime
+
+from . import alerts, auth, backtest, bot, calendar_data as cal, compare, market_data as md, portfolio
+from .indicators import bollinger, macd, rsi, sma, snapshot
+from .strategies import STRATEGIES, evaluate
 from .providers import PROVIDERS
 from .strategies import ordered
 
@@ -42,6 +45,7 @@ def meta():
     return {
         "strategies": [{"key": s.key, "name": s.name, "description": s.description} for s in ordered()],
         "universes": [{"key": k, "name": u["name"], "count": len(u["tickers"])} for k, u in bot.UNIVERSES.items()],
+        "alert_types": alerts.types_for_ui(),
         "status": bot.market_status(),
     }
 
@@ -64,6 +68,141 @@ def scan(req: ScanRequest):
     custom = [t for t in req.tickers.replace(" ", ",").split(",") if t.strip()]
     try:
         return _clean(bot.run_scan(req.strategy, req.universe, custom, top_n=15))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+class WatchAlert(BaseModel):
+    id: str = Field(max_length=64)
+    symbol: str = Field(max_length=20)
+    type: str = Field(max_length=40)
+    value: float | None = None
+    strategy: str | None = Field(default=None, max_length=40)
+
+
+class WatchRequest(BaseModel):
+    symbols: list[str] = Field(default_factory=list, max_length=150)
+    alerts: list[WatchAlert] = Field(default_factory=list, max_length=300)
+
+
+WATCH_FIELDS = ("price", "change_pct", "ret_5d", "ret_1m", "ret_3m", "rsi14", "vol_ratio", "pct_from_high",
+                "sma50", "sma200")
+
+
+@app.post("/api/watch")
+def watch(req: WatchRequest):
+    """Latest data for a watchlist plus the current state of each alert (polled by the browser)."""
+    syms = sorted({md.normalize(s) for s in req.symbols + [a.symbol for a in req.alerts] if s.strip()})
+    data = md.get_history(syms, period="2y", ttl=60) if syms else {}
+    snaps = {}
+    for s, df in data.items():
+        try:
+            snaps[s] = snapshot(df)
+        except Exception:
+            continue
+    # Earnings-date alerts need the next report date: fetched only for those symbols (cached for hours).
+    earn_syms = sorted({md.normalize(a.symbol) for a in req.alerts if a.type == "earnings_soon"} & set(snaps))
+    if earn_syms:
+        upcoming = {e["symbol"]: e["days_until"] for e in cal.upcoming_for(earn_syms, within_days=400)}
+        for s in earn_syms:
+            snaps[s] = {**snaps[s], "days_to_earnings": upcoming.get(s)}
+    rows = {}
+    for s, snap in snaps.items():
+        rows[s] = {k: snap.get(k) for k in WATCH_FIELDS}
+        rows[s]["scores"] = {k: evaluate(k, snap)["score"] for k in STRATEGIES}
+        rows[s]["spark"] = [round(float(x), 4) for x in data[s]["Close"].tail(30)]
+    results = {a.id: alerts.check_alert(a.model_dump() | {"symbol": md.normalize(a.symbol)},
+                                        snaps.get(md.normalize(a.symbol)))
+               for a in req.alerts}
+    return _clean({"rows": rows, "missing": [s for s in syms if s not in snaps], "alerts": results,
+                   "status": bot.market_status(), "as_of": datetime.now().isoformat(timespec="seconds")})
+
+
+@app.get("/api/calendar")
+def calendar(days: int = 7, min_cap: float = 10):
+    """Market-wide earnings (min_cap in $ billions) and US economic events for the next `days`."""
+    days = max(1, min(days, 45))
+    out, errors = {"days": days, "min_cap": min_cap}, []
+    for key, label, load in (("earnings", "Earnings", lambda: cal.market_earnings(days, min_cap * 1e9)),
+                             ("economic", "Economic", lambda: cal.economic_events(days))):
+        try:
+            out[key] = load()
+        except Exception as e:  # Yahoo's calendar endpoints are unofficial; degrade gracefully
+            out[key] = []
+            errors.append(f"{label} calendar unavailable: {e}")
+    out["errors"] = errors
+    out["as_of"] = datetime.now().isoformat(timespec="seconds")
+    return _clean(out)
+
+
+class SymbolsRequest(BaseModel):
+    symbols: list[str] = Field(default_factory=list, max_length=150)
+
+
+@app.post("/api/calendar/symbols")
+def calendar_symbols(req: SymbolsRequest):
+    """Next earnings date for each ticker (e.g. a watchlist)."""
+    return _clean({"upcoming": cal.upcoming_for(req.symbols, within_days=120)})
+
+
+@app.get("/api/ticker/{symbol}/earnings")
+def ticker_earnings(symbol: str):
+    return _clean(cal.ticker_earnings(symbol))
+
+
+class Holding(BaseModel):
+    symbol: str = Field(max_length=20)
+    shares: float
+    cost: float | None = None
+
+
+class PortfolioRequest(BaseModel):
+    holdings: list[Holding] = Field(max_length=portfolio.MAX_POSITIONS * 2)
+    cash: float = Field(default=0, ge=0)
+    period: str = "1y"
+    benchmark: str = Field(default="SPY", max_length=20)
+
+
+@app.post("/api/portfolio/analyze")
+def analyze_portfolio(req: PortfolioRequest):
+    """Holdings are sent by the browser for this calculation only; nothing is stored server-side."""
+    try:
+        return _clean(portfolio.analyze([h.model_dump() for h in req.holdings], req.cash, req.period, req.benchmark))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+class CompareRequest(BaseModel):
+    symbols: list[str] = Field(max_length=compare.MAX_SYMBOLS)
+    period: str = "1y"
+    benchmark: str = Field(default="SPY", max_length=20)
+
+
+@app.post("/api/compare")
+def compare_endpoint(req: CompareRequest):
+    try:
+        return _clean(compare.compare(req.symbols, req.period, req.benchmark))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+class BacktestRequest(BaseModel):
+    strategy: str
+    universe: str
+    tickers: str = ""
+    period: str = "2y"
+    rebalance: str = "monthly"
+    top_n: int = Field(default=10, ge=1, le=50)
+    cost_bps: float = Field(default=10, ge=0, le=500)
+    benchmark: str = "SPY"
+
+
+@app.post("/api/backtest")
+def run_backtest(req: BacktestRequest):
+    custom = [t for t in req.tickers.replace(" ", ",").split(",") if t.strip()]
+    try:
+        return _clean(backtest.run_backtest(req.strategy, req.universe, custom, req.period, req.rebalance,
+                                            req.top_n, req.cost_bps, req.benchmark))
     except ValueError as e:
         raise HTTPException(400, str(e))
 

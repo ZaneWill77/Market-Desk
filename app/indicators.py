@@ -72,8 +72,79 @@ def max_drawdown(close: pd.Series) -> float:
     return float(((close / peak) - 1).min() * 100)
 
 
+def _rolling_pctile_of_last(w: np.ndarray) -> float:
+    return float((w <= w[-1]).mean() * 100)
+
+
+def _rolling_max_dd(w: np.ndarray) -> float:
+    return float((w / np.maximum.accumulate(w) - 1).min() * 100)
+
+
+def snapshot_series(df: pd.DataFrame) -> pd.DataFrame:
+    """Every snapshot field for every date, computed once and strictly causally:
+    row i only uses data up to and including row i (no look-ahead). The backtester
+    reads rows from this; snapshot() is the same calculation for the latest row."""
+    c, v = df["Close"], df["Volume"]
+    m_line, m_sig, m_hist = macd(c)
+    bb_u, bb_m, bb_l = bollinger(c)
+    r = rsi(c)
+    s50, s200 = sma(c, 50), sma(c, 200)
+    width = (bb_u - bb_l) / bb_m
+    vol20 = v.rolling(20).mean()
+    hi52 = c.rolling(252, min_periods=1).max()
+    lo52 = c.rolling(252, min_periods=1).min()
+    ret = lambda n: (c / c.shift(n) - 1) * 100  # noqa: E731
+    out = pd.DataFrame({
+        "price": c,
+        "change_pct": ret(1),
+        "sma20": sma(c, 20),
+        "sma50": s50,
+        "sma200": s200,
+        "sma50_prev": s50.shift(5),
+        "sma200_prev": s200.shift(5),
+        "ema21": ema(c, 21),
+        "rsi14": r,
+        "rsi_prev": r.shift(1),
+        "macd": m_line,
+        "macd_signal": m_sig,
+        "macd_hist": m_hist,
+        "macd_hist_prev": m_hist.shift(1),
+        "bb_upper": bb_u,
+        "bb_lower": bb_l,
+        "bb_width": width,
+        "bb_width_pctile": width.rolling(126, min_periods=30).apply(_rolling_pctile_of_last, raw=True),
+        "atr14": atr(df),
+        "adx14": adx(df),
+        "volume": v,
+        "vol_ratio": v / vol20,
+        "high_52w": hi52,
+        "low_52w": lo52,
+        "pct_from_high": (c / hi52 - 1) * 100,
+        "pct_from_low": (c / lo52 - 1) * 100,
+        "ret_1d": ret(1),
+        "ret_5d": ret(5),
+        "ret_1m": ret(21),
+        "ret_3m": ret(63),
+        "ret_6m": ret(126),
+        "ret_12m": ret(252),
+        "ret_12_1": (c.shift(21) / c.shift(252) - 1) * 100,
+        "vol_60d": c.pct_change().rolling(60, min_periods=20).std() * np.sqrt(252) * 100,
+        "max_dd_1y": c.rolling(252, min_periods=2).apply(_rolling_max_dd, raw=True),
+    }, index=df.index)
+    return out.replace([np.inf, -np.inf], np.nan)
+
+
+def row_to_snapshot(row: pd.Series) -> dict:
+    return {k: (None if pd.isna(x) else float(x)) for k, x in row.items()}
+
+
 def snapshot(df: pd.DataFrame) -> dict:
     """Latest values of every indicator for one ticker; used by strategies and Claude tools."""
+    return row_to_snapshot(snapshot_series(df).iloc[-1])
+
+
+def _snapshot_legacy(df: pd.DataFrame) -> dict:
+    """Original single-date implementation, kept for the equivalence test."""
     c = df["Close"]
     m_line, m_sig, m_hist = macd(c)
     bb_u, bb_m, bb_l = bollinger(c)

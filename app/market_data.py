@@ -6,8 +6,13 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
+import logging
+
 import pandas as pd
 import yfinance as yf
+
+# yfinance logs every missing ticker / ETF-without-fundamentals as an error; we handle those ourselves.
+logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
 _cache: dict[Any, tuple[float, Any]] = {}
 _lock = threading.Lock()
@@ -37,8 +42,10 @@ def normalize(symbol: str) -> str:
     return symbol.strip().upper().replace(".", "-") if not symbol.strip().startswith("^") else symbol.strip().upper()
 
 
-def get_history(tickers: list[str], period: str = "2y", interval: str = "1d") -> dict[str, pd.DataFrame]:
-    """Return {ticker: OHLCV DataFrame}. Tickers that fail are omitted."""
+def get_history(tickers: list[str], period: str = "2y", interval: str = "1d",
+                ttl: int = HISTORY_TTL) -> dict[str, pd.DataFrame]:
+    """Return {ticker: OHLCV DataFrame}. Tickers that fail are omitted.
+    `ttl` is how many seconds a cached download stays fresh (watchlists use a shorter one)."""
     tickers = sorted({normalize(t) for t in tickers if t.strip()})
     if not tickers:
         return {}
@@ -73,7 +80,7 @@ def get_history(tickers: list[str], period: str = "2y", interval: str = "1d") ->
             fetch(missing, out)
         return out
 
-    return _cached(("hist", tuple(tickers), period, interval), HISTORY_TTL, load)
+    return _cached(("hist", tuple(tickers), period, interval), ttl, load)
 
 
 def get_one(symbol: str, period: str = "2y", interval: str = "1d") -> pd.DataFrame | None:
@@ -91,7 +98,7 @@ def get_info(symbol: str) -> dict:
         except Exception:
             return {}
         keys = [
-            "shortName", "longName", "sector", "industry", "marketCap", "trailingPE", "forwardPE",
+            "shortName", "longName", "quoteType", "category", "sector", "industry", "marketCap", "trailingPE", "forwardPE",
             "pegRatio", "priceToBook", "priceToSalesTrailing12Months", "profitMargins", "operatingMargins",
             "returnOnEquity", "revenueGrowth", "earningsGrowth", "debtToEquity", "dividendYield",
             "beta", "targetMeanPrice", "recommendationKey", "numberOfAnalystOpinions",

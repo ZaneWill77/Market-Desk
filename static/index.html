@@ -69,6 +69,120 @@
         <ul id="regimeNotes" class="notes"></ul>
       </section>
 
+      <!-- Watchlist & alerts -->
+      <section class="card" id="watchCard">
+        <div class="card-head">
+          <h2>Watchlist</h2>
+          <div class="watch-tools">
+            <select id="wlSelect" title="Switch watchlist" aria-label="Watchlist"></select>
+            <button id="wlNew" class="btn ghost sm" type="button" title="Create a new watchlist">＋ List</button>
+            <button id="wlRename" class="btn ghost sm" type="button">Rename</button>
+            <button id="wlDelete" class="btn ghost sm" type="button">Delete</button>
+            <span class="tool-sep"></span>
+            <button id="wlExport" class="btn ghost sm" type="button" title="Download your watchlists and alerts as a backup file">Export</button>
+            <label class="btn ghost sm" title="Restore watchlists and alerts from a backup file">Import<input id="wlImport" type="file" accept="application/json,.json" hidden /></label>
+          </div>
+        </div>
+        <form id="wlAddForm" class="controls">
+          <label class="grow">Add tickers <input id="wlAddInput" placeholder="AAPL, MSFT, BTC-USD…" autocomplete="off" /></label>
+          <button class="btn primary" type="submit">＋ Add</button>
+          <label>Score with <select id="wlStrategy"></select></label>
+          <span id="wlUpdated" class="muted small wl-updated"></span>
+        </form>
+        <div class="table-wrap wl-wrap" data-resize="watchlist" data-min="120">
+          <table id="wlTable">
+            <thead><tr>
+              <th>Symbol</th><th class="num">Price</th><th class="num">Day</th><th class="num">5D</th><th class="num">1M</th>
+              <th>30 days</th><th class="num">RSI</th><th class="num">Vol×</th><th class="num">From Hi</th><th>Score</th><th>Earnings</th><th class="num">Alerts</th><th></th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+          <p id="wlEmpty" class="muted small empty hidden">This watchlist is empty. Add tickers above, or click ☆ next to any stock in the bot results or ticker view.</p>
+        </div>
+        <div class="row-end"><button id="wlCompare" class="btn" type="button" title="Compare up to 8 tickers from this list">⇄ Compare</button><button id="wlCsv" class="btn" type="button">⬇ Export CSV</button><button id="askWlBtn" class="btn" type="button">✦ Ask Claude about this watchlist</button></div>
+
+        <h3>Alerts <span id="alertBadge" class="badge hidden"></span></h3>
+        <form id="alertForm" class="controls alert-form">
+          <label>Ticker <input id="alSymbol" placeholder="AAPL" class="sym-input" autocomplete="off" required /></label>
+          <label>Condition <select id="alType"></select></label>
+          <label id="alValueWrap">Value <span class="input-unit"><span id="alUnit"></span><input id="alValue" type="number" step="any" class="num-input" /></span></label>
+          <label id="alStrategyWrap" class="hidden">Strategy <select id="alStrategy"></select></label>
+          <label>Fire <select id="alRepeat"><option value="once">Once</option><option value="always">Every time it happens</option></select></label>
+          <button class="btn primary" type="submit">🔔 Add alert</button>
+        </form>
+        <p id="notifyHint" class="muted small"></p>
+        <div id="alertList" class="alert-list"></div>
+        <details class="alert-log">
+          <summary>Triggered history <span id="logCount" class="muted"></span></summary>
+          <ul id="alertLog"></ul>
+          <button id="clearLog" class="btn ghost sm" type="button">Clear history</button>
+        </details>
+      </section>
+
+      <!-- Portfolio -->
+      <section class="card" id="portfolioCard">
+        <div class="card-head">
+          <h2>Portfolio</h2>
+          <div class="watch-tools">
+            <button id="pfPasteBtn" class="btn ghost sm" type="button" title="Paste positions as text or a broker CSV">Paste</button>
+            <label class="btn ghost sm" title="Import a CSV exported from your broker">Import CSV<input id="pfImport" type="file" accept=".csv,.txt,text/csv" hidden /></label>
+            <button id="pfExport" class="btn ghost sm" type="button" title="Download your positions as a CSV you can re-import">Export</button>
+            <button id="pfClear" class="btn ghost sm" type="button">Clear</button>
+          </div>
+        </div>
+        <p class="muted small pf-privacy">🔒 Your holdings are saved only in this browser. They're sent to this app's server just to run the analysis and aren't stored there.</p>
+        <form id="pfAddForm" class="controls">
+          <label>Ticker <input id="pfSym" class="sym-input" placeholder="AAPL" autocomplete="off" required /></label>
+          <label>Shares <input id="pfShares" type="number" step="any" min="0" class="num-input" required /></label>
+          <label>Avg cost <span class="input-unit">$<input id="pfCost" type="number" step="any" min="0" class="num-input wide" placeholder="optional" title="Average cost per share (optional, enables P&amp;L)" /></span></label>
+          <button class="btn primary" type="submit">＋ Add position</button>
+          <span class="tool-sep"></span>
+          <label>Cash <span class="input-unit">$<input id="pfCash" type="number" step="any" min="0" class="num-input wide" placeholder="0" /></span></label>
+          <label>Period
+            <select id="pfPeriod"><option value="6mo">6 months</option><option value="1y" selected>1 year</option><option value="2y">2 years</option><option value="3y">3 years</option></select>
+          </label>
+        </form>
+        <div id="pfPaste" class="pf-paste hidden">
+          <textarea id="pfPasteText" rows="6" spellcheck="false" placeholder="One position per line: TICKER, SHARES, AVG COST (cost is optional)&#10;AAPL, 50, 150&#10;NVDA 120 95.50&#10;&#10;Or paste a CSV exported from your broker (with its header row)."></textarea>
+          <div class="row-end"><button id="pfPasteCancel" class="btn ghost sm" type="button">Cancel</button><button id="pfPasteAdd" class="btn primary sm" type="button">Add positions</button></div>
+        </div>
+        <p id="pfEmpty" class="empty muted small">No positions yet. Add them above, paste a list, or import a CSV from your broker.</p>
+        <div id="pfOut" class="hidden">
+          <div id="pfKpis" class="bt-kpis pf-kpis"></div>
+          <div class="table-wrap" data-resize="portfolio" data-min="160">
+            <table id="pfTable">
+              <thead><tr>
+                <th>Position</th><th class="num">Shares</th><th class="num">Avg cost</th><th class="num">Price</th><th class="num">Value</th><th>Weight</th>
+                <th class="num">Day</th><th class="num">P&amp;L</th><th class="num">P&amp;L %</th><th>Sector</th><th class="num">Beta</th>
+                <th class="num" title="Share of the portfolio's total risk (variance)">Risk</th><th>Rating</th><th>Earnings</th><th></th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="split pf-split">
+            <div><h3>Allocation by sector</h3><div id="pfSectors" class="alloc"></div></div>
+            <div>
+              <h3>By asset type</h3><div id="pfTypes" class="alloc"></div>
+              <h3>Concentration</h3><div id="pfConc" class="kv kv-1"></div>
+            </div>
+          </div>
+          <h3>Observations</h3>
+          <ul id="pfObs" class="obs"></ul>
+          <h3>Hypothetical performance <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">· today's positions held over the period</span></h3>
+          <div id="pfChart" class="chart-sm" data-resize="pf-chart" data-min="220"></div>
+          <div id="pfCorrWrap">
+            <h3>Correlation of daily returns <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">· largest 10 positions</span></h3>
+            <div id="pfCorr" class="corr-wrap"></div>
+          </div>
+          <p id="pfNotes" class="muted small"></p>
+          <div class="row-end">
+            <span class="csv-group"><span class="muted small">⬇ CSV:</span><button id="pfCsv" class="btn sm" type="button">Positions &amp; metrics</button></span>
+            <button id="pfCompare" class="btn" type="button">⇄ Compare top holdings</button>
+            <button id="askPfBtn" class="btn" type="button">✦ Ask Claude to review my portfolio</button>
+          </div>
+        </div>
+      </section>
+
       <section class="card">
         <div class="card-head">
           <h2>Sector Rotation</h2>
@@ -77,6 +191,31 @@
           </div>
         </div>
         <div id="sectors" class="sectors"></div>
+      </section>
+
+      <!-- Calendar -->
+      <section class="card" id="calendarCard">
+        <div class="card-head">
+          <h2>Calendar</h2>
+          <div class="seg" id="calTabs" role="tablist" aria-label="Calendar view">
+            <button type="button" role="tab" data-tab="economic" class="on">Economic</button><button type="button" role="tab" data-tab="earnings">Earnings</button><button type="button" role="tab" data-tab="watch">My watchlist</button>
+          </div>
+        </div>
+        <div class="controls cal-controls">
+          <div class="seg" id="calRange" role="group" aria-label="Date range">
+            <button type="button" data-days="7" class="on">Next 7 days</button><button type="button" data-days="14">14 days</button><button type="button" data-days="30">30 days</button>
+          </div>
+          <label class="cal-opt" data-for="economic">Impact
+            <select id="calImpact"><option value="high">High only</option><option value="medium" selected>High + medium</option><option value="all">All</option></select>
+          </label>
+          <label class="cal-opt hidden" data-for="earnings">Company size
+            <select id="calCap"><option value="2">$2B+</option><option value="10" selected>$10B+</option><option value="50">$50B+</option><option value="200">$200B+</option></select>
+          </label>
+          <label class="cal-opt hidden check" data-for="earnings"><input type="checkbox" id="calMine" /> Only my watchlist</label>
+          <span class="muted small cal-tz">Times in ET</span>
+        </div>
+        <div id="calBody" class="cal-body" data-resize="calendar" data-min="160"><div class="loading"><span class="spinner"></span> Loading calendar…</div></div>
+        <div class="row-end"><button id="askCalBtn" class="btn" type="button">✦ Ask Claude what's ahead this week</button></div>
       </section>
 
       <!-- Bot -->
@@ -98,7 +237,7 @@
         <div id="scanOut" class="hidden">
           <div id="breadth" class="breadth"></div>
           <div id="narrative" class="narrative"></div>
-          <div class="table-wrap">
+          <div class="table-wrap" data-resize="results" data-min="160">
             <table id="results">
               <thead><tr>
                 <th>#</th><th>Symbol</th><th>Score</th><th>Rating</th><th class="num">Price</th><th class="num">Day</th>
@@ -108,8 +247,45 @@
             </table>
           </div>
           <div class="row-end">
+            <button id="backtestThisBtn" class="btn">⟲ Backtest this strategy</button>
+            <button id="scanCompare" class="btn">⇄ Compare top 5</button>
+            <button id="scanCsv" class="btn">⬇ Export CSV</button>
             <button id="askScanBtn" class="btn">✦ Ask Claude to analyze these results</button>
           </div>
+        </div>
+      </section>
+
+      <!-- Backtest -->
+      <section class="card" id="backtestCard">
+        <div class="card-head"><h2>Strategy Backtest</h2></div>
+        <div class="controls">
+          <label>Strategy <select id="btStrategy"></select></label>
+          <label>Universe <select id="btUniverse"></select></label>
+          <label id="btCustomWrap" class="hidden grow">Tickers <input id="btTickers" placeholder="AAPL, MSFT, NVDA…" /></label>
+          <label>Period
+            <select id="btPeriod"><option value="1y">1 year</option><option value="2y" selected>2 years</option><option value="3y">3 years</option><option value="5y">5 years</option></select>
+          </label>
+          <label>Rebalance
+            <select id="btRebalance"><option value="monthly" selected>Monthly</option><option value="weekly">Weekly</option></select>
+          </label>
+          <label>Hold top <input id="btTopN" type="number" min="1" max="50" value="10" class="num-input" /></label>
+          <label>Cost (bps) <input id="btCost" type="number" min="0" max="500" step="1" value="10" class="num-input" /></label>
+          <button id="btRunBtn" class="btn primary">⟲ Run Backtest</button>
+        </div>
+        <p class="muted small">Each rebalance, the strategy scores every stock using only data available that day, buys the top picks in equal weight, and holds until the next rebalance.</p>
+        <div id="btOut" class="hidden">
+          <div id="btStats" class="bt-stats"></div>
+          <div id="btEquity" class="chart-sm" data-resize="bt-equity" data-min="220"></div>
+          <div id="btDrawdown" class="chart-xs" data-resize="bt-drawdown" data-min="120"></div>
+          <div id="btNotes" class="bt-notes"></div>
+          <h3>Rebalance history</h3>
+          <div class="table-wrap" data-resize="bt-periods" data-min="160">
+            <table id="btPeriods">
+              <thead><tr><th>Date</th><th class="num">Strategy</th><th class="num">SPY</th><th class="num">Excess</th><th class="num">Turnover</th><th>Holdings</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="row-end"><span class="csv-group"><span class="muted small">⬇ CSV:</span><button id="btCsvSummary" class="btn sm">Summary</button><button id="btCsvPeriods" class="btn sm">Rebalances</button><button id="btCsvEquity" class="btn sm">Daily equity</button></span><button id="askBtBtn" class="btn">✦ Ask Claude to interpret this backtest</button></div>
         </div>
       </section>
 
@@ -125,7 +301,7 @@
           </form>
         </div>
         <div id="tickerHeader" class="ticker-header"></div>
-        <div id="chart" class="chart"></div>
+        <div id="chart" class="chart" data-resize="chart" data-min="280"></div>
         <div class="split">
           <div>
             <h3>Strategy Scorecard</h3>
@@ -138,17 +314,70 @@
         </div>
         <div class="split">
           <div>
+            <h3>Earnings</h3>
+            <div id="earningsBox" class="earnings-box"><span class="muted">—</span></div>
+          </div>
+          <div>
             <h3>Fundamentals</h3>
             <div id="fundamentals" class="kv"><span class="muted">—</span></div>
           </div>
-          <div>
-            <h3>News</h3>
-            <ul id="news" class="news"></ul>
-          </div>
+        </div>
+        <div>
+          <h3>News</h3>
+          <ul id="news" class="news" data-resize="news" data-min="120"></ul>
         </div>
         <div class="row-end"><button id="askTickerBtn" class="btn">✦ Ask Claude about this ticker</button></div>
       </section>
+
+      <!-- Compare -->
+      <section class="card" id="compareCard">
+        <div class="card-head">
+          <h2>Compare</h2>
+          <div class="seg" id="cmpMode" role="group" aria-label="Chart mode">
+            <button type="button" data-mode="performance" class="on">Performance</button><button type="button" data-mode="relative">Relative strength</button>
+          </div>
+        </div>
+        <form id="cmpForm" class="controls">
+          <label class="grow"><span>Tickers <span class="muted">(up to 8)</span></span>
+            <div class="chip-input" id="cmpChips"><input id="cmpInput" placeholder="Type a ticker and press Enter…" autocomplete="off" aria-label="Add ticker to compare" /></div>
+          </label>
+          <label>Benchmark
+            <select id="cmpBench">
+              <option value="SPY">SPY · S&amp;P 500</option>
+              <option value="QQQ">QQQ · Nasdaq 100</option>
+              <option value="sector">Each stock's sector ETF</option>
+            </select>
+          </label>
+          <button class="btn primary" type="submit">⇄ Compare</button>
+        </form>
+        <div class="seg period-seg" id="cmpPeriod" role="group" aria-label="Period">
+          <button type="button" data-p="1mo">1M</button><button type="button" data-p="3mo">3M</button><button type="button" data-p="6mo">6M</button><button type="button" data-p="ytd">YTD</button><button type="button" data-p="1y" class="on">1Y</button><button type="button" data-p="2y">2Y</button><button type="button" data-p="5y">5Y</button>
+        </div>
+        <div id="cmpOut" class="hidden">
+          <div id="cmpChart" class="chart-sm" data-resize="cmp-chart" data-min="240"></div>
+          <p id="cmpNotes" class="muted small"></p>
+          <div class="table-wrap cmp-table">
+            <table id="cmpStats">
+              <thead><tr><th>Ticker</th><th class="num">Price</th><th class="num">Return</th><th>Benchmark</th><th class="num">Bench return</th><th class="num">vs Bench</th>
+                <th class="num">Volatility</th><th class="num">Max DD</th><th class="num">Beta</th><th class="num">Correlation</th><th class="num">RSI</th><th class="num">Best day</th><th class="num">Worst day</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div id="cmpCorrWrap">
+            <h3>Correlation of daily returns</h3>
+            <p class="muted small">+1 = always move together (little diversification) · 0 = unrelated · −1 = move opposite.</p>
+            <div id="cmpCorr" class="corr-wrap"></div>
+          </div>
+          <div class="row-end">
+            <span class="csv-group"><span class="muted small">⬇ CSV:</span><button id="cmpCsvStats" class="btn sm" type="button">Stats</button><button id="cmpCsvSeries" class="btn sm" type="button">Daily series</button></span>
+            <button id="askCmpBtn" class="btn" type="button">✦ Ask Claude about this comparison</button>
+          </div>
+        </div>
+      </section>
     </main>
+
+    <div id="splitter" class="splitter" role="separator" aria-orientation="vertical" tabindex="0"
+         title="Drag to resize the chat panel · double-click to reset"></div>
 
     <!-- Claude chat -->
     <aside class="chat">
@@ -184,6 +413,7 @@
     </aside>
   </div>
 
+  <div id="toasts" class="toasts" aria-live="polite"></div>
   <script src="/static/app.js"></script>
 </body>
 </html>
