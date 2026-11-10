@@ -3,6 +3,8 @@
 A stock market analysis dashboard with a strategy-driven **market bot** and a built-in
 **Claude analyst** you can chat with about live market data.
 
+![Market Desk dashboard: market overview, watchlist and the Claude analyst panel](docs/screenshots/dashboard.png)
+
 - **Market overview:** indices, VIX, yields, commodities and crypto, plus a Risk-On / Risk-Off regime read
 - **Watchlists & alerts:** multiple lists with live stats and strategy scores; 15 alert types (price, % move, RSI, strategy score, moving-average crosses, volume spikes, upcoming earnings) with desktop notifications
 - **Portfolio analysis:** enter holdings or import a broker CSV to get P&L, allocation, concentration, beta, volatility, Value-at-Risk, risk contribution per position, correlations and plain-language observations
@@ -25,13 +27,25 @@ needs no key, and intraday prices are delayed about 15 minutes.
 
 > This is an analysis tool, not financial advice.
 
+## Screenshots
+
+| Market bot | Strategy backtest |
+|---|---|
+| ![Momentum scan of the S&P 100 with scores, ratings and reasons](docs/screenshots/market-bot.png) | ![Backtest of a strategy vs SPY and an equal-weight universe](docs/screenshots/backtest.png) |
+| **Compare** | **Portfolio analysis** |
+| ![Relative strength of chip stocks vs their sector ETF, with a correlation matrix](docs/screenshots/compare.png) | ![Portfolio value, P&L, risk, allocation and observations](docs/screenshots/portfolio.png) |
+| **Calendar** | **Ticker analysis** |
+| ![Earnings calendar grouped by day with before-open / after-close timing](docs/screenshots/calendar.png) | ![NVDA chart with indicators, earnings markers, strategy scorecard and earnings history](docs/screenshots/ticker.png) |
+
+<sub>Screenshots use demo holdings and a sample watchlist.</sub>
+
 ## Quick start
 
 Requires Python 3.11+.
 
 ```bash
-git clone https://github.com/<you>/market-desk.git
-cd market-desk
+git clone https://github.com/ZaneWill77/Market-Desk.git
+cd Market-Desk
 ```
 
 - **Windows:** double-click `run.bat`
